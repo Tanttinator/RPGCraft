@@ -7,23 +7,94 @@ namespace RPGCraft
     /// <summary>
     /// Handles chunk mesh generation.
     /// </summary>
-    public class Chunk : MonoBehaviour
+    public class Chunk
     {
+        public ChunkCoords position;
+
         Block[,,] blocks;
 
-        public int cellsX;
-        public int cellsY;
+        Mesh mesh;
+        GameObject go;
 
-        float StepX => 1f / cellsX;
-        float StepY => 1f / cellsY;
+        public World world { get; protected set; }
+
+        public bool loaded { get; protected set; } = false;
+
+        public Chunk(ChunkCoords coords, World world)
+        {
+            position = coords;
+            this.world = world;
+            go = new GameObject("Chunk " + coords);
+            go.transform.SetParent(world.transform);
+
+            #if UNITY_EDITOR
+            MeshFilter filter = go.AddComponent<MeshFilter>();
+            Mesh copy = Mesh.Instantiate(filter.sharedMesh? filter.sharedMesh : new Mesh()) as Mesh;
+            mesh = filter.mesh = copy;
+            #else
+            mesh = go.AddComponent<MeshFilter>().sharedMesh;
+            #endif
+
+            go.AddComponent<MeshRenderer>().material = Reference.Instance.chunkMat;
+        }
+
+        /// <summary>
+        /// Try to get a block with the given coordinates in this chunk.
+        /// </summary>
+        /// <param name="coords"></param>
+        /// <returns></returns>
+        public Block GetBlock(Coords coords)
+        {
+            Coords relative = coords - position.GetStartPos();
+            if (relative.x < 0 || relative.x >= Reference.Instance.chunkSize || relative.y < 0 || relative.y >= Reference.Instance.chunkSize || relative.z < 0 || relative.z >= Reference.Instance.chunkSize)
+                return null;
+            return blocks[relative.x, relative.y, relative.z];
+        }
+
+        /// <summary>
+        /// Initialize all blocks.
+        /// </summary>
+        public void CreateBlocks()
+        {
+            int chunkSize = Reference.Instance.chunkSize;
+            blocks = new Block[chunkSize, chunkSize, chunkSize];
+            for (int x = 0; x < chunkSize; x++)
+            {
+                for (int y = 0; y < chunkSize; y++)
+                {
+                    for (int z = 0; z < chunkSize; z++)
+                    {
+                        Block block = new Block(new Coords(x, y, z) + position.GetStartPos(), this);
+                        blocks[x, y, z] = block;
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// Set the blocks in the chunk.
         /// </summary>
         /// <param name="blocks"></param>
-        public void SetBlocks(Block[,,] blocks)
+        public void SetBlocks(BlockType[,,] blocks)
         {
-            this.blocks = blocks;
+            int chunkSize = Reference.Instance.chunkSize;
+            for (int x = 0; x < chunkSize; x++)
+            {
+                for (int y = 0; y < chunkSize; y++)
+                {
+                    for (int z = 0; z < chunkSize; z++)
+                    {
+                        this.blocks[x, y, z].SetType(blocks[x, y, z]);
+                    }
+                }
+            }
+        }
+
+        public void UpdateChunk()
+        {
+            if (!loaded)
+                return;
+            GenerateMesh();
         }
 
         /// <summary>
@@ -34,7 +105,8 @@ namespace RPGCraft
             List<Vector3> vertices = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
             List<int> tris = new List<int>();
-            Mesh mesh = new Mesh();
+
+            mesh.Clear();
 
             int i = 0;
             foreach(Block block in blocks)
@@ -45,7 +117,7 @@ namespace RPGCraft
                 {
                     if (!block.IsVisibleFrom(direction))
                         continue;
-                    FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, StepX, StepY, 1f / (cellsX * 16), 1f / (cellsY * 16), i);
+                    FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, i);
                     vertices.AddRange(data.vertices);
                     uvs.AddRange(data.uvs);
                     mesh.subMeshCount++;
@@ -58,10 +130,26 @@ namespace RPGCraft
             mesh.uv = uvs.ToArray();
             mesh.triangles = tris.ToArray();
             mesh.RecalculateNormals();
+        }
 
-            MeshFilter filter = GetComponent<MeshFilter>();
+        public void Load()
+        {
+            go.SetActive(true);
+            loaded = true;
+            world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, -1))?.UpdateChunk();
+        }
 
-            filter.mesh = mesh;
+        public void Unload()
+        {
+            loaded = false;
+            go.SetActive(false);
+            world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, -1))?.UpdateChunk();
         }
 
         struct FaceData
@@ -70,9 +158,13 @@ namespace RPGCraft
             public Vector2[] uvs;
             public int[] tris;
 
-            public FaceData(Vector3 blockPos, Direction direction, Vector2 textureCell, float stepX, float stepY, float offsetX, float offsetY, int index)
+            public FaceData(Vector3 blockPos, Direction direction, Vector2 textureCell, int index)
             {
                 int maxId = index * 4 + 3;
+                float stepX = 1f / Reference.Instance.atlasWidth;
+                float stepY = 1f / Reference.Instance.atlasHeight;
+                float offsetX = stepX / 16f;
+                float offsetY = stepY / 16f;
                 Vector2 uvStart = new Vector2(textureCell.x * stepX, textureCell.y * stepY);
                 uvs = new Vector2[]
                 {

@@ -9,14 +9,33 @@ namespace RPGCraft
     /// </summary>
     public class Block
     {
-        public Vector3 position;
-        public BlockType type;
+        public Coords position { get; protected set; }
+        public BlockType type { get; protected set; }
 
         public Dictionary<Direction, Block> neighbors = new Dictionary<Direction, Block>();
 
+        public Chunk chunk { get; protected set; }
+
+        public Block(Coords position, Chunk chunk)
+        {
+            this.position = position;
+            this.chunk = chunk;
+            foreach(Direction direction in Direction.directions)
+            {
+                Block neighbor = chunk.world.GetBlock(position + direction.offset);
+                SetNeighbor(direction, neighbor);
+                if (neighbor != null)
+                    neighbor.SetNeighbor(direction.Opposite, this);
+
+            }
+        }
+
         public void SetNeighbor(Direction direction, Block block)
         {
-            neighbors.Add(direction, block);
+            if (neighbors.ContainsKey(direction))
+                neighbors[direction] = block;
+            else
+                neighbors.Add(direction, block);
         }
 
         public bool IsVisible
@@ -36,17 +55,27 @@ namespace RPGCraft
 
         public bool IsVisibleFrom(Direction direction)
         {
-            return !neighbors.ContainsKey(direction) || neighbors[direction] == null;
-        }
-
-        public Block(Vector3 position)
-        {
-            this.position = position;
+            if (!neighbors.ContainsKey(direction))
+                return true;
+            Block neighbor = neighbors[direction];
+            return neighbor == null || (neighbor.chunk != chunk && !neighbor.chunk.loaded);
         }
 
         public void SetType(BlockType type)
         {
             this.type = type;
+            if(chunk.loaded)
+                BlockUpdate();
+        }
+
+        public void BlockUpdate(bool updateNeighbors = true)
+        {
+            chunk.UpdateChunk();
+            if(updateNeighbors)
+            {
+                foreach (Block block in neighbors.Values)
+                    block?.BlockUpdate(false);
+            }
         }
     }
 }

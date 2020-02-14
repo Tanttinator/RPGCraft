@@ -8,66 +8,100 @@ namespace RPGCraft
     /// <summary>
     /// Handles world generation and chunks.
     /// </summary>
+    [ExecuteInEditMode]
     public class World : MonoBehaviour
     {
-        public int chunkSize;
-        public GameObject chunkGo;
-        private void Start()
+        Dictionary<ChunkCoords, Chunk> chunks = new Dictionary<ChunkCoords, Chunk>();
+
+        /// <summary>
+        /// Reset current world.
+        /// </summary>
+        public void ClearWorld()
         {
-            Block[,,] blocks = new Block[chunkSize, chunkSize, chunkSize];
-            for(int x = 0; x < chunkSize; x++)
+            while(transform.childCount > 0)
             {
-                for(int y = 0; y < chunkSize; y++)
-                {
-                    for(int z = 0; z < chunkSize; z++)
-                    {
-                        Block block = new Block(new Vector3(x, y, z));
-                        block.SetType(Blocks.Instance.stone);
-                        blocks[x, y, z] = block;
-                    }
-                }
+                DestroyImmediate(transform.GetChild(0).gameObject);
             }
+            chunks.Clear();
+        }
+
+        /// <summary>
+        /// Generates a new world.
+        /// </summary>
+        public void GenerateWorld()
+        {
+            ClearWorld();
+            GenerateChunk(new ChunkCoords(0, 0));
+        }
+
+        /// <summary>
+        /// Creates a new chunk at the given position.
+        /// </summary>
+        /// <param name="coords"></param>
+        public void GenerateChunk(ChunkCoords coords)
+        {
+            if (chunks.ContainsKey(coords))
+                return;
+            int chunkSize = Reference.Instance.chunkSize;
+            BlockType[,,] blocks = new BlockType[chunkSize, chunkSize, chunkSize];
             for (int x = 0; x < chunkSize; x++)
             {
                 for (int y = 0; y < chunkSize; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
-                        foreach (Direction direction in Direction.directions)
-                        {
-                            Block block = blocks[x, y, z];
-                            Vector3 pos = block.position + direction.offset;
-                            if(pos.x >= 0 && pos.x < chunkSize && pos.y >= 0 && pos.y < chunkSize &&  pos.z >= 0 && pos.z < chunkSize)
-                                blocks[x, y, z].SetNeighbor(direction, blocks[(int)pos.x, (int)pos.y, (int)pos.z]);
-                        }
+                        if (y == chunkSize - 1)
+                            blocks[x, y, z] = Blocks.Instance.grass;
+                        else if (y > chunkSize - 4)
+                            blocks[x, y, z] = Blocks.Instance.dirt;
+                        else
+                            blocks[x, y, z] = Blocks.Instance.stone;
                     }
                 }
             }
-            Chunk chunk = Instantiate(chunkGo, new Vector3(0, 0, 0), Quaternion.identity, transform).GetComponent<Chunk>();
+            Chunk chunk = new Chunk(coords, this);
+            chunks.Add(coords, chunk);
+            chunk.CreateBlocks();
             chunk.SetBlocks(blocks);
             chunk.GenerateMesh();
+            chunk.Load();
+        }
+
+        public Block GetBlock(Coords coords)
+        {
+            ChunkCoords chunk = coords.GetChunk();
+            if (!chunks.ContainsKey(chunk))
+                return null;
+            return chunks[chunk].GetBlock(coords);
+        }
+
+        public Chunk GetChunk(ChunkCoords coords)
+        {
+            if (!chunks.ContainsKey(coords))
+                return null;
+            return chunks[coords];
         }
     }
 
     public class Direction
     {
-        public Vector3 offset;
+        public Coords offset;
         Func<Direction> opposite;
 
         public Direction Opposite => opposite.Invoke();
 
-        public Direction(Vector3 offset, Func<Direction> opposite)
+        public Direction(Coords offset, Func<Direction> opposite)
         {
             this.offset = offset;
             this.opposite = opposite;
         }
 
-        public static Direction UP = new Direction(new Vector3(0, 1, 0), () => DOWN);
-        public static Direction DOWN = new Direction(new Vector3(0, -1, 0), () => UP);
-        public static Direction NORTH = new Direction(new Vector3(0, 0, 1), () => SOUTH);
-        public static Direction EAST = new Direction(new Vector3(1, 0, 0), () => WEST);
-        public static Direction SOUTH = new Direction(new Vector3(0, 0, -1), () => NORTH);
-        public static Direction WEST = new Direction(new Vector3(-1, 0, 0), () => EAST);
+        public static Direction UP = new Direction(new Coords(0, 1, 0), () => DOWN);
+        public static Direction DOWN = new Direction(new Coords(0, -1, 0), () => UP);
+        public static Direction NORTH = new Direction(new Coords(0, 0, 1), () => SOUTH);
+        public static Direction EAST = new Direction(new Coords(1, 0, 0), () => WEST);
+        public static Direction SOUTH = new Direction(new Coords(0, 0, -1), () => NORTH);
+        public static Direction WEST = new Direction(new Coords(-1, 0, 0), () => EAST);
 
         public static Direction[] directions = new Direction[]
         {
@@ -78,5 +112,82 @@ namespace RPGCraft
             SOUTH,
             WEST
         };
+    }
+
+    public struct Coords
+    {
+        public int x;
+        public int y;
+        public int z;
+
+        public Coords(int x, int y, int z)
+        {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+        }
+
+        public ChunkCoords GetChunk()
+        {
+            return new ChunkCoords(Mathf.FloorToInt(x * 1f / Reference.Instance.chunkSize), Mathf.FloorToInt(z * 1f / Reference.Instance.chunkSize));
+        }
+
+        public static Coords operator +(Coords a, Coords b)
+        {
+            return new Coords(a.x + b.x, a.y + b.y, a.z + b.z);
+        }
+
+        public static Coords operator -(Coords a, Coords b)
+        {
+            return new Coords(a.x - b.x, a.y - b.y, a.z - b.z);
+        }
+
+        public static implicit operator Coords(Vector3 v3)
+        {
+            return new Coords((int)v3.x, (int)v3.y, (int)v3.z);
+        }
+
+        public static implicit operator Vector3(Coords coords)
+        {
+            return new Vector3(coords.x, coords.y, coords.z);
+        }
+
+        public override string ToString()
+        {
+            return "(" + x + ", " + y + ", " + z + ")";
+        }
+
+    }
+
+    public struct ChunkCoords
+    {
+        public int x;
+        public int z;
+
+        public ChunkCoords(int x, int z)
+        {
+            this.x = x;
+            this.z = z;
+        }
+
+        public Coords GetStartPos()
+        {
+            return new Coords(x * Reference.Instance.chunkSize, 0, z * Reference.Instance.chunkSize);
+        }
+
+        public override string ToString()
+        {
+            return "(" + x + ", " + z + ")";
+        }
+
+        public static ChunkCoords operator +(ChunkCoords a, ChunkCoords b)
+        {
+            return new ChunkCoords(a.x + b.x, a.z + b.z);
+        }
+
+        public static ChunkCoords operator -(ChunkCoords a, ChunkCoords b)
+        {
+            return new ChunkCoords(a.x - b.x, a.z - b.z);
+        }
     }
 }

@@ -5,22 +5,22 @@ using UnityEngine;
 namespace RPGCraft
 {
     /// <summary>
-    /// Registry for blocks.
+    /// Global values accessible anywhere.
     /// </summary>
     [ExecuteInEditMode]
-    public class Blocks : MonoBehaviour
+    public class Reference : MonoBehaviour
     {
-        static Blocks instance;
-        public static Blocks Instance
+        static Reference instance;
+        public static Reference Instance
         {
             get
             {
                 if (instance == null)
                 {
-                    instance = FindObjectOfType<Blocks>();
+                    instance = FindObjectOfType<Reference>();
                     if (instance == null)
                     {
-                        Debug.LogError("Couldn't find an instance of Blocks!");
+                        Debug.LogError("Couldn't find an instance of Reference!");
                         return null;
                     }
                 }
@@ -28,6 +28,11 @@ namespace RPGCraft
             }
         }
 
-        public BlockType dirt, grass, stone, sand, water;
+        public int chunkSize;
+
+        public int atlasWidth;
+        public int atlasHeight;
+
+        public Material chunkMat;
     }
 }
