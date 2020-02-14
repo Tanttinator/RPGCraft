@@ -21,7 +21,9 @@ namespace RPGCraft
                 {
                     for(int z = 0; z < chunkSize; z++)
                     {
-                        blocks[x, y, z] = new Block(new Vector3(x, y, z));
+                        Block block = new Block(new Vector3(x, y, z));
+                        block.SetType(Blocks.Instance.stone);
+                        blocks[x, y, z] = block;
                     }
                 }
             }

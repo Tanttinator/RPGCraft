@@ -10,6 +10,7 @@ namespace RPGCraft
     public class Block
     {
         public Vector3 position;
+        public BlockType type;
 
         public Dictionary<Direction, Block> neighbors = new Dictionary<Direction, Block>();
 
@@ -24,7 +25,7 @@ namespace RPGCraft
             {
                 foreach(Direction direction in Direction.directions)
                 {
-                    if(!neighbors.ContainsKey(direction) || neighbors[direction] == null)
+                    if(IsVisibleFrom(direction))
                     {
                         return true;
                     }
@@ -33,9 +34,19 @@ namespace RPGCraft
             }
         }
 
+        public bool IsVisibleFrom(Direction direction)
+        {
+            return !neighbors.ContainsKey(direction) || neighbors[direction] == null;
+        }
+
         public Block(Vector3 position)
         {
             this.position = position;
+        }
+
+        public void SetType(BlockType type)
+        {
+            this.type = type;
         }
     }
 }

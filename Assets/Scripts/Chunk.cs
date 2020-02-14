@@ -43,7 +43,9 @@ namespace RPGCraft
                     continue;
                 foreach (Direction direction in Direction.directions)
                 {
-                    FaceData data = new FaceData(block.position, direction, new Vector2(0, 0), StepX, StepY, 1f / (cellsX * 16), 1f / (cellsY * 16), i);
+                    if (!block.IsVisibleFrom(direction))
+                        continue;
+                    FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, StepX, StepY, 1f / (cellsX * 16), 1f / (cellsY * 16), i);
                     vertices.AddRange(data.vertices);
                     uvs.AddRange(data.uvs);
                     mesh.subMeshCount++;
