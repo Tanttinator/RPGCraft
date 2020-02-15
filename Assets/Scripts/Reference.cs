@@ -34,5 +34,7 @@ namespace RPGCraft
         public int atlasHeight;
 
         public Material chunkMat;
+
+        public int renderDistance;
     }
 }

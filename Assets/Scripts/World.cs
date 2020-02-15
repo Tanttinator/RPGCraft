@@ -12,6 +12,7 @@ namespace RPGCraft
     public class World : MonoBehaviour
     {
         Dictionary<ChunkCoords, Chunk> chunks = new Dictionary<ChunkCoords, Chunk>();
+        List<ChunkCoords> loadedChunks = new List<ChunkCoords>();
 
         /// <summary>
         /// Reset current world.
@@ -23,6 +24,7 @@ namespace RPGCraft
                 DestroyImmediate(transform.GetChild(0).gameObject);
             }
             chunks.Clear();
+            loadedChunks.Clear();
         }
 
         /// <summary>
@@ -31,14 +33,15 @@ namespace RPGCraft
         public void GenerateWorld()
         {
             ClearWorld();
-            GenerateChunk(new ChunkCoords(0, 0));
+            GenerateChunk(new ChunkCoords(0, 0), false);
+
         }
 
         /// <summary>
         /// Creates a new chunk at the given position.
         /// </summary>
         /// <param name="coords"></param>
-        public void GenerateChunk(ChunkCoords coords)
+        public void GenerateChunk(ChunkCoords coords, bool threaded = true)
         {
             if (chunks.ContainsKey(coords))
                 return;
@@ -63,7 +66,10 @@ namespace RPGCraft
             chunks.Add(coords, chunk);
             chunk.CreateBlocks();
             chunk.SetBlocks(blocks);
-            chunk.GenerateMesh();
+            if (threaded)
+                chunk.GenerateMeshThreaded();
+            else
+                chunk.GenerateMeshImmediate();
             chunk.Load();
         }
 
@@ -80,6 +86,58 @@ namespace RPGCraft
             if (!chunks.ContainsKey(coords))
                 return null;
             return chunks[coords];
+        }
+
+        public void LoadChunk(ChunkCoords coords)
+        {
+            if (loadedChunks.Contains(coords))
+                return;
+            if (chunks.ContainsKey(coords))
+            {
+                chunks[coords].Load();
+            } else
+            {
+                GenerateChunk(coords, false);
+            }
+            loadedChunks.Add(coords);
+        }
+
+        void UnloadChunk(ChunkCoords coords)
+        {
+            loadedChunks.Remove(coords);
+            if (chunks.ContainsKey(coords))
+                chunks[coords].Unload();
+        }
+
+        void OnPlayerSpawned(Player player)
+        {
+            player.onPlayerMove += OnPlayerMoved;
+        }
+
+        void OnPlayerMoved(Vector3 position)
+        {
+            ChunkCoords chunk = ((Coords)position).GetChunk();
+            int renderDistance = Reference.Instance.renderDistance;
+            List<ChunkCoords> unloadChunks = new List<ChunkCoords>();
+            foreach(ChunkCoords coords in loadedChunks)
+            {
+                if (coords.Distance(chunk) > renderDistance)
+                    unloadChunks.Add(coords);
+            }
+            for(int x = -renderDistance; x <= renderDistance; x++)
+            {
+                for(int z = -renderDistance; z <= renderDistance; z++)
+                {
+                    LoadChunk(chunk + new ChunkCoords(x, z));
+                }
+            }
+            foreach (ChunkCoords coords in unloadChunks)
+                UnloadChunk(coords);
+        }
+
+        private void Awake()
+        {
+            GetComponent<GameController>().onPlayerSpawned += OnPlayerSpawned;
         }
     }
 
@@ -216,6 +274,11 @@ namespace RPGCraft
         public static ChunkCoords operator -(ChunkCoords a, ChunkCoords b)
         {
             return new ChunkCoords(a.x - b.x, a.z - b.z);
+        }
+
+        public int Distance(ChunkCoords other)
+        {
+            return Mathf.Max(Mathf.Abs(other.x - x), Mathf.Abs(other.z - z));
         }
     }
 }

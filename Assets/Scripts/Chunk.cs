@@ -1,5 +1,6 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
 using UnityEngine;
 
 namespace RPGCraft
@@ -13,8 +14,7 @@ namespace RPGCraft
 
         Block[,,] blocks;
 
-        Mesh mesh;
-        GameObject go;
+        ChunkObject obj;
 
         public World world { get; protected set; }
 
@@ -24,16 +24,9 @@ namespace RPGCraft
         {
             position = coords;
             this.world = world;
-            go = new GameObject("Chunk " + coords);
-            go.layer = 9;
-            go.transform.SetParent(world.transform);
-
-            MeshFilter filter = go.AddComponent<MeshFilter>();
-            Mesh copy = Mesh.Instantiate(filter.sharedMesh? filter.sharedMesh : new Mesh()) as Mesh;
-            mesh = filter.mesh = copy;
-
-            go.AddComponent<MeshCollider>();
-            go.AddComponent<MeshRenderer>().material = Reference.Instance.chunkMat;
+            obj = new GameObject("Chunk " + coords).AddComponent<ChunkObject>();
+            obj.gameObject.layer = 9;
+            obj.transform.SetParent(world.transform);
         }
 
         /// <summary>
@@ -92,13 +85,13 @@ namespace RPGCraft
         {
             if (!loaded)
                 return;
-            GenerateMesh();
+            GenerateMeshThreaded();
         }
 
         /// <summary>
         /// Builds a mesh from the blocks in the chunk.
         /// </summary>
-        public void GenerateMesh()
+        ChunkObject.MeshData GenerateMesh()
         {
             List<Vector3> vertices = new List<Vector3>();
             List<Vector2> uvs = new List<Vector2>();
@@ -106,9 +99,6 @@ namespace RPGCraft
 
             List<Vector3> colliderVertices = new List<Vector3>();
             List<int> colliderTris = new List<int>();
-
-            mesh.Clear();
-            Mesh colliderMesh = new Mesh();
 
             int i = 0;
             foreach(Block block in blocks)
@@ -132,20 +122,29 @@ namespace RPGCraft
                 }
             }
 
-            mesh.vertices = vertices.ToArray();
-            mesh.uv = uvs.ToArray();
-            mesh.triangles = tris.ToArray();
-            mesh.RecalculateNormals();
+            return new ChunkObject.MeshData(vertices.ToArray(), uvs.ToArray(), tris.ToArray(), colliderVertices.ToArray(), colliderTris.ToArray());
+        }
 
-            colliderMesh.vertices = colliderVertices.ToArray();
-            colliderMesh.triangles = colliderTris.ToArray();
-            colliderMesh.RecalculateNormals();
-            go.GetComponent<MeshCollider>().sharedMesh = colliderMesh;
+        public void GenerateMeshThreaded()
+        {
+            ThreadStart threadStart = new ThreadStart(delegate
+            {
+                obj.meshQueue.Enqueue(GenerateMesh());
+            });
+            Thread thread = new Thread(threadStart);
+            thread.Start();
+        }
+
+        public void GenerateMeshImmediate()
+        {
+            obj.ApplyMesh(GenerateMesh());
         }
 
         public void Load()
         {
-            go.SetActive(true);
+            if (loaded)
+                return;
+            obj.gameObject.SetActive(true);
             loaded = true;
             world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
             world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
@@ -155,8 +154,10 @@ namespace RPGCraft
 
         public void Unload()
         {
+            if (!loaded)
+                return;
             loaded = false;
-            go.SetActive(false);
+            obj.gameObject.SetActive(false);
             world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
             world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
             world.GetChunk(position + new ChunkCoords(0, 1))?.UpdateChunk();

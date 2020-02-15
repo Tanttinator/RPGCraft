@@ -17,7 +17,7 @@ namespace RPGCraft
             chunkX = EditorGUILayout.IntField("Chunk X", chunkX);
             chunkZ = EditorGUILayout.IntField("Chunk Z", chunkZ);
             if (GUILayout.Button("Generate Chunk"))
-                world.GenerateChunk(new ChunkCoords(chunkX, chunkZ));
+                world.LoadChunk(new ChunkCoords(chunkX, chunkZ));
             if (GUILayout.Button("Generate World"))
                 world.GenerateWorld();
             if (GUILayout.Button("Clear World"))

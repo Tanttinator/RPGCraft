@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using System;
 
 namespace RPGCraft
 {
@@ -13,6 +14,8 @@ namespace RPGCraft
 
         public GameObject playerObj;
 
+        public event Action<Player> onPlayerSpawned;
+
         private void Start()
         {
             Cursor.lockState = CursorLockMode.Locked;
@@ -21,6 +24,7 @@ namespace RPGCraft
             world.GenerateWorld();
             Player player = Instantiate(playerObj, new Vector3(8f, 16f, 8f), Quaternion.identity).GetComponent<Player>();
             player.world = world;
+            onPlayerSpawned?.Invoke(player);
         }
     }
 }
