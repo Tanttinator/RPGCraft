@@ -8,6 +8,8 @@ namespace RPGCraft
     public class BlockType : ScriptableObject
     {
         new public string name;
+        public bool solid = true;
+        public bool transparent = false;
         public BlockModel model;
     }
 

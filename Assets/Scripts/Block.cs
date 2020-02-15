@@ -58,7 +58,7 @@ namespace RPGCraft
             if (!neighbors.ContainsKey(direction))
                 return true;
             Block neighbor = neighbors[direction];
-            return neighbor == null || (neighbor.chunk != chunk && !neighbor.chunk.loaded);
+            return neighbor == null || neighbor.type.transparent || (neighbor.chunk != chunk && !neighbor.chunk.loaded);
         }
 
         public void SetType(BlockType type)
@@ -76,6 +76,18 @@ namespace RPGCraft
                 foreach (Block block in neighbors.Values)
                     block?.BlockUpdate(false);
             }
+        }
+    }
+
+    public class BlockHitInfo
+    {
+        public Block block;
+        public Direction face;
+
+        public BlockHitInfo(Block block, Direction face)
+        {
+            this.block = block;
+            this.face = face;
         }
     }
 }

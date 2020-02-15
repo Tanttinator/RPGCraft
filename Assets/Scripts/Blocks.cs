@@ -28,6 +28,6 @@ namespace RPGCraft
             }
         }
 
-        public BlockType dirt, grass, stone, sand, water;
+        public BlockType dirt, grass, stone, sand, water, empty;
     }
 }

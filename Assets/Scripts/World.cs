@@ -132,6 +132,11 @@ namespace RPGCraft
             return new ChunkCoords(Mathf.FloorToInt(x * 1f / Reference.Instance.chunkSize), Mathf.FloorToInt(z * 1f / Reference.Instance.chunkSize));
         }
 
+        public Coords Neighbor(Direction direction)
+        {
+            return this + direction.offset;
+        }
+
         public static Coords operator +(Coords a, Coords b)
         {
             return new Coords(a.x + b.x, a.y + b.y, a.z + b.z);
@@ -144,7 +149,7 @@ namespace RPGCraft
 
         public static implicit operator Coords(Vector3 v3)
         {
-            return new Coords((int)v3.x, (int)v3.y, (int)v3.z);
+            return new Coords(Mathf.FloorToInt(v3.x), Mathf.FloorToInt(v3.y), Mathf.FloorToInt(v3.z));
         }
 
         public static implicit operator Vector3(Coords coords)
@@ -155,6 +160,29 @@ namespace RPGCraft
         public override string ToString()
         {
             return "(" + x + ", " + y + ", " + z + ")";
+        }
+
+        public static bool operator ==(Coords a, Coords b)
+        {
+            return a.Equals(b);
+        }
+
+        public static bool operator !=(Coords a, Coords b)
+        {
+            return !a.Equals(b);
+        }
+
+        public override bool Equals(object obj)
+        {
+            if (!(obj is Coords))
+                return false;
+            Coords coords = (Coords)obj;
+            return coords.x == x && coords.y == y && coords.z == z;
+        }
+
+        public override int GetHashCode()
+        {
+            return base.GetHashCode();
         }
 
     }

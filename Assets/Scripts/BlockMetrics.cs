@@ -8,14 +8,14 @@ namespace RPGCraft {
     /// </summary>
     public static class BlockMetrics
     {
-        public static Vector3 wds = new Vector3(-0.5f, -0.5f, -0.5f);
-        public static Vector3 eds = new Vector3(0.5f, -0.5f, -0.5f);
-        public static Vector3 wus = new Vector3(-0.5f, 0.5f, -0.5f);
-        public static Vector3 eus = new Vector3(0.5f, 0.5f, -0.5f);
-        public static Vector3 wdn = new Vector3(-0.5f, -0.5f, 0.5f);
-        public static Vector3 edn = new Vector3(0.5f, -0.5f, 0.5f);
-        public static Vector3 wun = new Vector3(-0.5f, 0.5f, 0.5f);
-        public static Vector3 eun = new Vector3(0.5f, 0.5f, 0.5f);
+        public static Vector3 wds = new Vector3(0f, 0f, 0f);
+        public static Vector3 eds = new Vector3(1f, 0f, 0f);
+        public static Vector3 wus = new Vector3(0f, 1f, 0f);
+        public static Vector3 eus = new Vector3(1f, 1f, 0f);
+        public static Vector3 wdn = new Vector3(0f, 0f, 1f);
+        public static Vector3 edn = new Vector3(1f, 0f, 1f);
+        public static Vector3 wun = new Vector3(0f, 1f, 1f);
+        public static Vector3 eun = new Vector3(1f, 1f, 1f);
 
         public static Vector3[] up = new Vector3[]
                 {

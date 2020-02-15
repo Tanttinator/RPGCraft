@@ -25,16 +25,14 @@ namespace RPGCraft
             position = coords;
             this.world = world;
             go = new GameObject("Chunk " + coords);
+            go.layer = 9;
             go.transform.SetParent(world.transform);
 
-            #if UNITY_EDITOR
             MeshFilter filter = go.AddComponent<MeshFilter>();
             Mesh copy = Mesh.Instantiate(filter.sharedMesh? filter.sharedMesh : new Mesh()) as Mesh;
             mesh = filter.mesh = copy;
-            #else
-            mesh = go.AddComponent<MeshFilter>().sharedMesh;
-            #endif
 
+            go.AddComponent<MeshCollider>();
             go.AddComponent<MeshRenderer>().material = Reference.Instance.chunkMat;
         }
 
@@ -106,7 +104,11 @@ namespace RPGCraft
             List<Vector2> uvs = new List<Vector2>();
             List<int> tris = new List<int>();
 
+            List<Vector3> colliderVertices = new List<Vector3>();
+            List<int> colliderTris = new List<int>();
+
             mesh.Clear();
+            Mesh colliderMesh = new Mesh();
 
             int i = 0;
             foreach(Block block in blocks)
@@ -115,13 +117,17 @@ namespace RPGCraft
                     continue;
                 foreach (Direction direction in Direction.directions)
                 {
-                    if (!block.IsVisibleFrom(direction))
+                    if (!block.IsVisibleFrom(direction) || block.type.model.GetFace(direction) == null)
                         continue;
                     FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, i);
                     vertices.AddRange(data.vertices);
                     uvs.AddRange(data.uvs);
-                    mesh.subMeshCount++;
                     tris.AddRange(data.tris);
+                    if(block.type.solid)
+                    {
+                        colliderVertices.AddRange(data.vertices);
+                        colliderTris.AddRange(data.tris);
+                    }
                     i++;
                 }
             }
@@ -130,6 +136,11 @@ namespace RPGCraft
             mesh.uv = uvs.ToArray();
             mesh.triangles = tris.ToArray();
             mesh.RecalculateNormals();
+
+            colliderMesh.vertices = colliderVertices.ToArray();
+            colliderMesh.triangles = colliderTris.ToArray();
+            colliderMesh.RecalculateNormals();
+            go.GetComponent<MeshCollider>().sharedMesh = colliderMesh;
         }
 
         public void Load()
