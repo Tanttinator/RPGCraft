@@ -243,6 +243,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: ea973ce633af43844985ba63ac14f90b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  noiseSettings: {fileID: 11400000, guid: 508960e1cff57c541968457caa1e96ad, type: 2}
+  seed: 0
+  heightMultiplier: 32
+  waterLevel: 0.5
 --- !u!4 &1081524274
 Transform:
   m_ObjectHideFlags: 0
@@ -288,9 +292,11 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   chunkSize: 16
+  worldHeight: 32
   atlasWidth: 8
   atlasHeight: 8
   chunkMat: {fileID: 2100000, guid: 2598afc2637dfc04aa9c7cd19faeb581, type: 2}
+  renderDistance: 2
 --- !u!114 &1081524277
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -22,7 +22,7 @@ namespace RPGCraft
             Cursor.visible = false;
             world = GetComponent<World>();
             world.GenerateWorld();
-            Player player = Instantiate(playerObj, new Vector3(8f, 16f, 8f), Quaternion.identity).GetComponent<Player>();
+            Player player = Instantiate(playerObj, new Vector3(8f, world.GetGroundLevel(8, 8) + 1, 8f), Quaternion.identity).GetComponent<Player>();
             player.world = world;
             onPlayerSpawned?.Invoke(player);
         }

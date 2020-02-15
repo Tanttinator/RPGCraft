@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 
@@ -8,9 +9,9 @@ namespace RPGCraft
     public class ChunkObject : MonoBehaviour
     {
         MeshFilter filter;
-        MeshCollider collider;
+        new MeshCollider collider;
 
-        public Queue<MeshData> meshQueue = new Queue<MeshData>();
+        public Queue<MeshThreadData> meshQueue = new Queue<MeshThreadData>();
 
         private void Awake()
         {
@@ -19,15 +20,16 @@ namespace RPGCraft
             collider = gameObject.AddComponent<MeshCollider>();
         }
 
-        public void ApplyMesh(MeshData data)
+        public void ApplyMesh(MeshThreadData data)
         {
-            filter.sharedMesh = data.Mesh;
-            collider.sharedMesh = data.ColliderMesh;
+            filter.sharedMesh = data.mesh.Mesh;
+            collider.sharedMesh = data.mesh.ColliderMesh;
+            data.callback?.Invoke();
         }
 
         private void Update()
         {
-            if (meshQueue.Count > 1)
+            if (meshQueue.Count > 0)
                 ApplyMesh(meshQueue.Dequeue());
         }
 
@@ -72,6 +74,18 @@ namespace RPGCraft
                 this.tris = tris;
                 this.colliderVertices = colliderVertices;
                 this.colliderTris = colliderTris;
+            }
+        }
+
+        public struct MeshThreadData
+        {
+            public MeshData mesh;
+            public Action callback;
+
+            public MeshThreadData(MeshData data, Action callback)
+            {
+                mesh = data;
+                this.callback = callback;
             }
         }
     }

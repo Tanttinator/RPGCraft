@@ -29,6 +29,7 @@ namespace RPGCraft
         }
 
         public int chunkSize;
+        public int worldHeight;
 
         public int atlasWidth;
         public int atlasHeight;

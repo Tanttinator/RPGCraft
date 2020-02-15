@@ -58,7 +58,7 @@ namespace RPGCraft
             if (!neighbors.ContainsKey(direction))
                 return true;
             Block neighbor = neighbors[direction];
-            return neighbor == null || neighbor.type.transparent || (neighbor.chunk != chunk && !neighbor.chunk.loaded);
+            return neighbor == null || neighbor.type == null || (neighbor.type.transparent && neighbor.type != type) || (neighbor.chunk != chunk && !neighbor.chunk.loaded);
         }
 
         public void SetType(BlockType type)

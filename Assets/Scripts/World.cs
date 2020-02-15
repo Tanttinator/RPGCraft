@@ -2,6 +2,8 @@
 using System.Collections.Generic;
 using UnityEngine;
 using System;
+using PerlinNoise;
+using System.Threading;
 
 namespace RPGCraft
 {
@@ -13,6 +15,16 @@ namespace RPGCraft
     {
         Dictionary<ChunkCoords, Chunk> chunks = new Dictionary<ChunkCoords, Chunk>();
         List<ChunkCoords> loadedChunks = new List<ChunkCoords>();
+
+        public Settings noiseSettings;
+
+        public int seed;
+
+        public int heightMultiplier;
+        [Range(0f, 1f)]
+        public float waterLevel;
+
+        Queue<Chunk> threadedChunks = new Queue<Chunk>();
 
         /// <summary>
         /// Reset current world.
@@ -33,7 +45,8 @@ namespace RPGCraft
         public void GenerateWorld()
         {
             ClearWorld();
-            GenerateChunk(new ChunkCoords(0, 0), false);
+            seed = UnityEngine.Random.Range(-999999, 999999);
+            GenerateChunkImmediate(new ChunkCoords(0, 0));
 
         }
 
@@ -41,24 +54,51 @@ namespace RPGCraft
         /// Creates a new chunk at the given position.
         /// </summary>
         /// <param name="coords"></param>
-        public void GenerateChunk(ChunkCoords coords, bool threaded = true)
+        Chunk GenerateChunk(ChunkCoords coords)
         {
             if (chunks.ContainsKey(coords))
-                return;
+                return null;
             int chunkSize = Reference.Instance.chunkSize;
-            BlockType[,,] blocks = new BlockType[chunkSize, chunkSize, chunkSize];
+            int worldHeight = Reference.Instance.worldHeight;
+            BlockType[,,] blocks = new BlockType[chunkSize, worldHeight, chunkSize];
+            float[,] heightMap = Generator.GenerateHeightmap(chunkSize, chunkSize, seed, noiseSettings, new Vector2(coords.GetStartPos().x, coords.GetStartPos().z));
+            int waterHeight = (int)(worldHeight * waterLevel);
             for (int x = 0; x < chunkSize; x++)
             {
-                for (int y = 0; y < chunkSize; y++)
+                for (int y = 0; y < worldHeight; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
-                        if (y == chunkSize - 1)
-                            blocks[x, y, z] = Blocks.Instance.grass;
-                        else if (y > chunkSize - 4)
-                            blocks[x, y, z] = Blocks.Instance.dirt;
+                        BlockType type;
+                        int groundHeight = (int)(heightMultiplier * heightMap[x, z]);
+                        if (y > Mathf.Max(groundHeight, waterHeight))
+                            type = Blocks.Instance.empty;
+                        else if(groundHeight > waterHeight)
+                        {
+                            if (y == groundHeight)
+                                type = Blocks.Instance.grass;
+                            else if (y > groundHeight - 4)
+                                type = Blocks.Instance.dirt;
+                            else
+                                type = Blocks.Instance.stone;
+                        }
+                        else if(groundHeight == waterHeight)
+                        {
+                            if (y > groundHeight - 4)
+                                type = Blocks.Instance.sand;
+                            else
+                                type = Blocks.Instance.stone;
+                        }
                         else
-                            blocks[x, y, z] = Blocks.Instance.stone;
+                        {
+                            if (y > groundHeight)
+                                type = Blocks.Instance.water;
+                            else if (y > groundHeight - 4)
+                                type = Blocks.Instance.sand;
+                            else
+                                type = Blocks.Instance.stone;
+                        }
+                        blocks[x, y, z] = type;
                     }
                 }
             }
@@ -66,11 +106,23 @@ namespace RPGCraft
             chunks.Add(coords, chunk);
             chunk.CreateBlocks();
             chunk.SetBlocks(blocks);
-            if (threaded)
-                chunk.GenerateMeshThreaded();
-            else
-                chunk.GenerateMeshImmediate();
+            return chunk;
+        }
+
+        public void GenerateChunkImmediate(ChunkCoords coords)
+        {
+            Chunk chunk = GenerateChunk(coords);
+            chunk.GenerateMeshImmediate();
             chunk.Load();
+        } 
+
+        public void GenerateChunkThreaded(ChunkCoords coords)
+        {
+            ThreadStart threadStart = new ThreadStart(delegate
+            {
+                threadedChunks.Enqueue(GenerateChunk(coords));
+            });
+            new Thread(threadStart).Start();
         }
 
         public Block GetBlock(Coords coords)
@@ -88,6 +140,14 @@ namespace RPGCraft
             return chunks[coords];
         }
 
+        public int GetGroundLevel(int x, int z)
+        {
+            ChunkCoords coords = new Coords(x, 0, z).GetChunk();
+            if (!chunks.ContainsKey(coords))
+                return -1;
+            return chunks[coords].GetGroundLevel(x, z);
+        }
+
         public void LoadChunk(ChunkCoords coords)
         {
             if (loadedChunks.Contains(coords))
@@ -97,7 +157,7 @@ namespace RPGCraft
                 chunks[coords].Load();
             } else
             {
-                GenerateChunk(coords, false);
+                GenerateChunkThreaded(coords);
             }
             loadedChunks.Add(coords);
         }
@@ -138,6 +198,14 @@ namespace RPGCraft
         private void Awake()
         {
             GetComponent<GameController>().onPlayerSpawned += OnPlayerSpawned;
+        }
+
+        private void Update()
+        {
+            if(threadedChunks.Count > 0)
+            {
+                threadedChunks.Dequeue().GenerateMeshThreaded((c) => c.Load());
+            }
         }
     }
 

@@ -1,4 +1,5 @@
-﻿using System.Collections;
+﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Threading;
 using UnityEngine;
@@ -24,9 +25,6 @@ namespace RPGCraft
         {
             position = coords;
             this.world = world;
-            obj = new GameObject("Chunk " + coords).AddComponent<ChunkObject>();
-            obj.gameObject.layer = 9;
-            obj.transform.SetParent(world.transform);
         }
 
         /// <summary>
@@ -39,6 +37,8 @@ namespace RPGCraft
             Coords relative = coords - position.GetStartPos();
             if (relative.x < 0 || relative.x >= Reference.Instance.chunkSize || relative.y < 0 || relative.y >= Reference.Instance.chunkSize || relative.z < 0 || relative.z >= Reference.Instance.chunkSize)
                 return null;
+            if (blocks == null)
+                return null;
             return blocks[relative.x, relative.y, relative.z];
         }
 
@@ -48,10 +48,11 @@ namespace RPGCraft
         public void CreateBlocks()
         {
             int chunkSize = Reference.Instance.chunkSize;
-            blocks = new Block[chunkSize, chunkSize, chunkSize];
+            int worldHeight = Reference.Instance.worldHeight;
+            blocks = new Block[chunkSize, worldHeight, chunkSize];
             for (int x = 0; x < chunkSize; x++)
             {
-                for (int y = 0; y < chunkSize; y++)
+                for (int y = 0; y < worldHeight; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
@@ -69,9 +70,10 @@ namespace RPGCraft
         public void SetBlocks(BlockType[,,] blocks)
         {
             int chunkSize = Reference.Instance.chunkSize;
+            int worldHeight = Reference.Instance.worldHeight;
             for (int x = 0; x < chunkSize; x++)
             {
-                for (int y = 0; y < chunkSize; y++)
+                for (int y = 0; y < worldHeight; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
@@ -79,6 +81,18 @@ namespace RPGCraft
                     }
                 }
             }
+        }
+
+        public int GetGroundLevel(int x, int z)
+        {
+            int groundLevel = 0;
+            for(int y = 0; y < Reference.Instance.worldHeight; y++)
+            {
+                if (blocks[x, y, z].type != Blocks.Instance.empty)
+                    groundLevel = y;
+            }
+
+            return groundLevel;
         }
 
         public void UpdateChunk()
@@ -101,6 +115,7 @@ namespace RPGCraft
             List<int> colliderTris = new List<int>();
 
             int i = 0;
+            int collider = 0;
             foreach(Block block in blocks)
             {
                 if (!block.IsVisible)
@@ -109,14 +124,15 @@ namespace RPGCraft
                 {
                     if (!block.IsVisibleFrom(direction) || block.type.model.GetFace(direction) == null)
                         continue;
-                    FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, i);
+                    FaceData data = new FaceData(block.position, direction, block.type.model.GetFace(direction).textureCoord, i, collider);
                     vertices.AddRange(data.vertices);
                     uvs.AddRange(data.uvs);
                     tris.AddRange(data.tris);
                     if(block.type.solid)
                     {
                         colliderVertices.AddRange(data.vertices);
-                        colliderTris.AddRange(data.tris);
+                        colliderTris.AddRange(data.colliderTris);
+                        collider++;
                     }
                     i++;
                 }
@@ -125,11 +141,17 @@ namespace RPGCraft
             return new ChunkObject.MeshData(vertices.ToArray(), uvs.ToArray(), tris.ToArray(), colliderVertices.ToArray(), colliderTris.ToArray());
         }
 
-        public void GenerateMeshThreaded()
+        public void GenerateMeshThreaded(Action<Chunk> callback = null)
         {
+            if(obj == null)
+            {
+                obj = new GameObject("Chunk " + position).AddComponent<ChunkObject>();
+                obj.gameObject.layer = 9;
+                obj.transform.SetParent(world.transform);
+            }
             ThreadStart threadStart = new ThreadStart(delegate
             {
-                obj.meshQueue.Enqueue(GenerateMesh());
+                obj.meshQueue.Enqueue(new ChunkObject.MeshThreadData(GenerateMesh(), () => callback?.Invoke(this)));
             });
             Thread thread = new Thread(threadStart);
             thread.Start();
@@ -137,7 +159,13 @@ namespace RPGCraft
 
         public void GenerateMeshImmediate()
         {
-            obj.ApplyMesh(GenerateMesh());
+            if (obj == null)
+            {
+                obj = new GameObject("Chunk " + position).AddComponent<ChunkObject>();
+                obj.gameObject.layer = 9;
+                obj.transform.SetParent(world.transform);
+            }
+            obj.ApplyMesh(new ChunkObject.MeshThreadData(GenerateMesh(), null));
         }
 
         public void Load()
@@ -169,10 +197,12 @@ namespace RPGCraft
             public Vector3[] vertices;
             public Vector2[] uvs;
             public int[] tris;
+            public int[] colliderTris;
 
-            public FaceData(Vector3 blockPos, Direction direction, Vector2 textureCell, int index)
+            public FaceData(Vector3 blockPos, Direction direction, Vector2 textureCell, int index, int colliderIndex)
             {
                 int maxId = index * 4 + 3;
+                int maxIdCollider = colliderIndex * 4 + 3;
                 float stepX = 1f / Reference.Instance.atlasWidth;
                 float stepY = 1f / Reference.Instance.atlasHeight;
                 float offsetX = stepX / 16f;
@@ -193,6 +223,10 @@ namespace RPGCraft
                 tris = new int[]
                 {
                     maxId - 3, maxId, maxId - 2, maxId - 3, maxId - 1, maxId
+                };
+                colliderTris = new int[]
+                {
+                    maxIdCollider - 3, maxIdCollider, maxIdCollider - 2, maxIdCollider - 3, maxIdCollider - 1, maxIdCollider
                 };
             }
         }
