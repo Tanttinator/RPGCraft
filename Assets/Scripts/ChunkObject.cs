@@ -11,8 +11,6 @@ namespace RPGCraft
         MeshFilter filter;
         new MeshCollider collider;
 
-        public Queue<MeshThreadData> meshQueue = new Queue<MeshThreadData>();
-
         private void Awake()
         {
             filter = gameObject.AddComponent<MeshFilter>();
@@ -25,12 +23,6 @@ namespace RPGCraft
             filter.sharedMesh = data.mesh.Mesh;
             collider.sharedMesh = data.mesh.ColliderMesh;
             data.callback?.Invoke();
-        }
-
-        private void Update()
-        {
-            if (meshQueue.Count > 0)
-                ApplyMesh(meshQueue.Dequeue());
         }
 
         public struct MeshData
@@ -76,17 +68,19 @@ namespace RPGCraft
                 this.colliderTris = colliderTris;
             }
         }
+    }
 
-        public struct MeshThreadData
+    public struct MeshThreadData
+    {
+        public Chunk chunk;
+        public ChunkObject.MeshData mesh;
+        public Action callback;
+
+        public MeshThreadData(Chunk chunk, ChunkObject.MeshData data, Action<Chunk> callback)
         {
-            public MeshData mesh;
-            public Action callback;
-
-            public MeshThreadData(MeshData data, Action callback)
-            {
-                mesh = data;
-                this.callback = callback;
-            }
+            this.chunk = chunk;
+            mesh = data;
+            this.callback = () => callback?.Invoke(chunk);
         }
     }
 }

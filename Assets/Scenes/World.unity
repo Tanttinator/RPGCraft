@@ -224,6 +224,7 @@ GameObject:
   - component: {fileID: 1081524275}
   - component: {fileID: 1081524276}
   - component: {fileID: 1081524277}
+  - component: {fileID: 1081524278}
   m_Layer: 0
   m_Name: World
   m_TagString: Untagged
@@ -244,9 +245,10 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   noiseSettings: {fileID: 11400000, guid: 508960e1cff57c541968457caa1e96ad, type: 2}
-  seed: 0
-  heightMultiplier: 32
-  waterLevel: 0.5
+  seed: 746561
+  heightMultiplier: 16
+  waterHeight: 8
+  startingChunks: 3
 --- !u!4 &1081524274
 Transform:
   m_ObjectHideFlags: 0
@@ -292,7 +294,6 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   chunkSize: 16
-  worldHeight: 32
   atlasWidth: 8
   atlasHeight: 8
   chunkMat: {fileID: 2100000, guid: 2598afc2637dfc04aa9c7cd19faeb581, type: 2}
@@ -311,3 +312,15 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   playerObj: {fileID: 1139152087899489381, guid: 191bc40ca38730c4883568fb684298e8,
     type: 3}
+--- !u!114 &1081524278
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1081524272}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: b3f54b3a71ee6304eb46d5fe7314987f, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using UnityEngine;
 
@@ -15,11 +16,13 @@ namespace RPGCraft
 
         Block[,,] blocks;
 
-        ChunkObject obj;
+        public ChunkObject obj { get; protected set; }
 
         public World world { get; protected set; }
 
         public bool loaded { get; protected set; } = false;
+
+        static List<BuildThreadInput> buildCache = new List<BuildThreadInput>();
 
         public Chunk(ChunkCoords coords, World world)
         {
@@ -42,17 +45,26 @@ namespace RPGCraft
             return blocks[relative.x, relative.y, relative.z];
         }
 
+        public void CreateGO()
+        {
+            if (obj == null)
+            {
+                obj = new GameObject("Chunk " + position).AddComponent<ChunkObject>();
+                obj.gameObject.layer = 9;
+                obj.transform.SetParent(world.transform);
+            }
+        }
+
         /// <summary>
         /// Initialize all blocks.
         /// </summary>
         public void CreateBlocks()
         {
             int chunkSize = Reference.Instance.chunkSize;
-            int worldHeight = Reference.Instance.worldHeight;
-            blocks = new Block[chunkSize, worldHeight, chunkSize];
+            blocks = new Block[chunkSize, chunkSize, chunkSize];
             for (int x = 0; x < chunkSize; x++)
             {
-                for (int y = 0; y < worldHeight; y++)
+                for (int y = 0; y < chunkSize; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
@@ -70,10 +82,9 @@ namespace RPGCraft
         public void SetBlocks(BlockType[,,] blocks)
         {
             int chunkSize = Reference.Instance.chunkSize;
-            int worldHeight = Reference.Instance.worldHeight;
             for (int x = 0; x < chunkSize; x++)
             {
-                for (int y = 0; y < worldHeight; y++)
+                for (int y = 0; y < chunkSize; y++)
                 {
                     for (int z = 0; z < chunkSize; z++)
                     {
@@ -86,7 +97,7 @@ namespace RPGCraft
         public int GetGroundLevel(int x, int z)
         {
             int groundLevel = 0;
-            for(int y = 0; y < Reference.Instance.worldHeight; y++)
+            for(int y = 0; y < Reference.Instance.chunkSize; y++)
             {
                 if (blocks[x, y, z].type != Blocks.Instance.empty)
                     groundLevel = y;
@@ -143,53 +154,63 @@ namespace RPGCraft
 
         public void GenerateMeshThreaded(Action<Chunk> callback = null)
         {
-            if(obj == null)
-            {
-                obj = new GameObject("Chunk " + position).AddComponent<ChunkObject>();
-                obj.gameObject.layer = 9;
-                obj.transform.SetParent(world.transform);
-            }
-            ThreadStart threadStart = new ThreadStart(delegate
-            {
-                obj.meshQueue.Enqueue(new ChunkObject.MeshThreadData(GenerateMesh(), () => callback?.Invoke(this)));
-            });
-            Thread thread = new Thread(threadStart);
-            thread.Start();
+            buildCache.Add(new BuildThreadInput(this, callback));
         }
 
         public void GenerateMeshImmediate()
         {
-            if (obj == null)
-            {
-                obj = new GameObject("Chunk " + position).AddComponent<ChunkObject>();
-                obj.gameObject.layer = 9;
-                obj.transform.SetParent(world.transform);
-            }
-            obj.ApplyMesh(new ChunkObject.MeshThreadData(GenerateMesh(), null));
+            obj.ApplyMesh(new MeshThreadData(this, GenerateMesh(), null));
         }
 
         public void Load()
         {
-            if (loaded)
+            if (loaded || obj == null)
                 return;
-            obj.gameObject.SetActive(true);
+            //obj.gameObject.SetActive(true);
+            obj.GetComponent<MeshRenderer>().enabled = true;
             loaded = true;
-            world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(0, 1))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(0, -1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(1, 0, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(-1, 0, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 0, 1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 0, -1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, -1, 0))?.UpdateChunk();
         }
 
         public void Unload()
         {
-            if (!loaded)
+            if (!loaded || obj == null)
                 return;
             loaded = false;
-            obj.gameObject.SetActive(false);
-            world.GetChunk(position + new ChunkCoords(1, 0))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(-1, 0))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(0, 1))?.UpdateChunk();
-            world.GetChunk(position + new ChunkCoords(0, -1))?.UpdateChunk();
+            //obj.gameObject.SetActive(false);
+            obj.GetComponent<MeshRenderer>().enabled = false;
+            world.GetChunk(position + new ChunkCoords(1, 0, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(-1, 0, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 0, 1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 0, -1))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, 1, 0))?.UpdateChunk();
+            world.GetChunk(position + new ChunkCoords(0, -1, 0))?.UpdateChunk();
+        }
+
+        public static void StartBuildThread()
+        {
+            ThreadStart buildThreadStart = new ThreadStart(delegate
+            {
+                while(true)
+                {
+                    if(buildCache.Count > 0)
+                    {
+                        BuildThreadInput input = buildCache[0];
+                        buildCache.Remove(input);
+                        if (input.chunk == null)
+                            continue;
+                        ChunkObject.MeshData data = input.chunk.GenerateMesh();
+                        ChunkBuilder.buildQueue.Add(new MeshThreadData(input.chunk, data, input.callback));
+                    }
+                }
+            });
+            Thread thread = new Thread(buildThreadStart);
+            thread.Start();
         }
 
         struct FaceData
@@ -228,6 +249,18 @@ namespace RPGCraft
                 {
                     maxIdCollider - 3, maxIdCollider, maxIdCollider - 2, maxIdCollider - 3, maxIdCollider - 1, maxIdCollider
                 };
+            }
+        }
+
+        public struct BuildThreadInput
+        {
+            public Chunk chunk;
+            public Action<Chunk> callback;
+
+            public BuildThreadInput(Chunk chunk, Action<Chunk> callback)
+            {
+                this.chunk = chunk;
+                this.callback = callback;
             }
         }
     }
